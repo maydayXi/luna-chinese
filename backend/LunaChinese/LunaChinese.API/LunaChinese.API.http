@@ -1,0 +1,6 @@
+@LunaChinese.API_HostAddress = http://localhost:5247
+
+GET {{LunaChinese.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
