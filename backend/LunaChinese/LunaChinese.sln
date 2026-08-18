@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LunaChinese.API", "LunaChinese.API\LunaChinese.API.csproj", "{5A773914-2BE4-45D6-BD04-C4CC97BB6A4F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LunaChinese.Core", "LunaChinese.Core\LunaChinese.Core.csproj", "{8D933EEE-C24A-4D67-8041-9DE965D05608}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{5A773914-2BE4-45D6-BD04-C4CC97BB6A4F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5A773914-2BE4-45D6-BD04-C4CC97BB6A4F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5A773914-2BE4-45D6-BD04-C4CC97BB6A4F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D933EEE-C24A-4D67-8041-9DE965D05608}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D933EEE-C24A-4D67-8041-9DE965D05608}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D933EEE-C24A-4D67-8041-9DE965D05608}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D933EEE-C24A-4D67-8041-9DE965D05608}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
