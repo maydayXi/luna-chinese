@@ -10,17 +10,17 @@ namespace LunaChinese.Core.Models;
 /// <param name="Hun">The Korean gloss of the character's meaning (훈).</param>
 /// <param name="Eum">The Korean reading of the Hanja character, i.e. its romanization (음).</param>
 /// <param name="Radical">The radical of the character.</param>
-/// <param name="RadicalNameKorea">The name of the radical in Korean.</param>
-/// <param name="RadicalNameEnglish">The name of the radical in English.</param>
-/// <param name="RadicalMeaningKorea">The meaning of the radical in Korean.</param>
-/// <param name="RadicalMeaningEnglish">The meaning of the radical in English.</param>
-/// <param name="StoryKorea">A mnemonic story for the character in Korean.</param>
-/// <param name="StoryEnglish">A mnemonic story for the character in English.</param>
+/// <param name="KoreanRadicalName">The name of the radical in Korean.</param>
+/// <param name="EnglishRadicalName">The name of the radical in English.</param>
+/// <param name="KoreanRadicalMeaning">The meaning of the radical in Korean.</param>
+/// <param name="EnglishRadicalMeaning">The meaning of the radical in English.</param>
+/// <param name="KoreanMeaningStory">A mnemonic story for the character in Korean.</param>
+/// <param name="EnglishMeaningStory">A mnemonic story for the character in English.</param>
 /// <example>
 /// var character = new CharacterAnalysis(
 /// Character: "腳",
-/// TraditionalCharacter: "腳",
-/// SimplifiedCharacter: "脚",
+/// Traditional: "腳",
+/// Simplified: "脚",
 /// Hun: "다리",
 /// Eum: "각",
 /// Radical: "月",
@@ -28,8 +28,8 @@ namespace LunaChinese.Core.Models;
 /// EnglishRadicalName: "flesh radical",
 /// KoreanRadicalMeaning: "몸이나 살",
 /// EnglishRadicalMeaning: "body or flesh",
-/// KoreanMnemonicStory: "몸과 연결된 발을 떠올린다.",
-/// EnglishMnemonicStory: "Think of the foot as part of the body.");
+/// KoreanMeaningStory: "몸과 연결된 발을 떠올린다.",
+/// EnglishMeaningStory: "Think of the foot as part of the body.");
 /// </example>
 public sealed record CharacterAnalysis(
     string Character,
@@ -38,9 +38,9 @@ public sealed record CharacterAnalysis(
     string Hun,
     string Eum,
     string Radical,
-    string RadicalNameKorea,
-    string RadicalNameEnglish,
-    string RadicalMeaningKorea,
-    string RadicalMeaningEnglish,
-    string StoryKorea,
-    string StoryEnglish);
+    string KoreanRadicalName,
+    string EnglishRadicalName,
+    string KoreanRadicalMeaning,
+    string EnglishRadicalMeaning,
+    string KoreanMeaningStory,
+    string EnglishMeaningStory);
