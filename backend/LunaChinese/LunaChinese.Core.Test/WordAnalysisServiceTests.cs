@@ -7,21 +7,33 @@ namespace LunaChinese.Core.Test;
 
 /// <summary>
 /// Behavioral tests for <see cref="WordAnalysisService"/>.
-/// The cache and AI client are substituted so each test can isolate one aspect of the orches tration:
-/// 
+/// The cache and AI client are substituted so each test can isolate one aspect of the
+/// orchestration: input normalization, cache hits versus misses, batching of the misses,
+/// per-word progress reporting, per-word failures, result ordering, and cancellation.
 /// </summary>
 public class WordAnalysisServiceTests
 {
+    /// <summary>
+    /// The substituted cache; unconfigured by default, so each test states its own hits and misses.
+    /// </summary>
     private readonly IAnalysisCache _cache = Substitute.For<IAnalysisCache>();
 
+    /// <summary>
+    /// The substituted AI client; unconfigured by default, so each test states its own responses.
+    /// </summary>
     private readonly IWordAnalysisAiClient _aiClient = Substitute.For<IWordAnalysisAiClient>();
 
     /// <summary>
-    /// Create a system under test.
+    /// Creates the system under test over the two substitutes.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>A <see cref="WordAnalysisService"/> wired to <see cref="_cache"/> and <see cref="_aiClient"/>.</returns>
     private WordAnalysisService CreateSut() => new(_cache, _aiClient);
 
+    /// <summary>
+    /// Configures the cache so the given words are hits and every other word is a miss.
+    /// Call it with no arguments to make the whole request a cache miss.
+    /// </summary>
+    /// <param name="cachedWords">The words the cache should already hold an analysis for.</param>
     private void GivenCached(params string[] cachedWords)
     {
         var hits = cachedWords.ToDictionary(word => word, TestData.Analysis);
@@ -40,6 +52,10 @@ public class WordAnalysisServiceTests
             });
     }
 
+    /// <summary>
+    /// Configures the AI client to return a successful analysis for every word it is asked about,
+    /// so a test can focus on the surrounding orchestration rather than on provider failures.
+    /// </summary>
     private void GivenAiSucceedsForAll()
     {
         // Accept any passed parameters
@@ -57,6 +73,10 @@ public class WordAnalysisServiceTests
             });
     }
 
+    /// <summary>
+    /// A request made up entirely of blank entries normalizes to nothing.
+    /// The batch short-circuits: neither the cache nor the AI client is consulted.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_WithNoUsableWords_ReturnEmptyResultWithoutTouchingCacheOrAi()
     {
@@ -85,6 +105,11 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// Requested words are trimmed, blanks dropped and duplicates collapsed before
+    /// any lookup, so both the returned items and the single AI call see one entry
+    /// per distinct word, in the original request order.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_TrimsBlanksAndCollapsesDuplicates()
     {
@@ -103,7 +128,7 @@ public class WordAnalysisServiceTests
 
         #region Assert
         // Verify that blank entries are removed, duplicates are collapsed,
-        // and surrounding whitespace is trimmed. 
+        // and surrounding whitespace is trimmed.
         Assert.Equal(expected, result.Items.Select(item => item.RequestedWord));
 
         // Verify that AnalyzeAsync is called exactly once with the normalized,
@@ -115,6 +140,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// When the cache answers for every requested word the batch is fully successful
+    /// and the AI client is never called.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_WhenAllWordCached_DoesNotCallAi()
     {
@@ -136,6 +165,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// A cache hit is still reported through <see cref="IProgress{T}"/>, marked
+    /// <c>FromCache</c>, and counted toward the batch's completed and total counts.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_ReportsCacheHitsWithFromCacheTrue()
     {
@@ -173,6 +206,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// With one hit and one miss, only the miss reaches the AI client: it is called
+    /// once, and the cached word is not included in that call.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_SendsOnlyUncachedWordsToAi()
     {
@@ -199,6 +236,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// A word analyzed by the AI client is reported with <c>FromCache</c> false,
+    /// which is what distinguishes a fresh analysis from a cache hit.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_ReportsFreshResultWithFromCatchFalse()
     {
@@ -213,7 +254,7 @@ public class WordAnalysisServiceTests
         #endregion
 
         #region Act
-        // Analyze an uncached word adn capture its progress update.
+        // Analyze an uncached word and capture its progress update.
         await sut.AnalyzeBatchAsync(TestData.Command(word), progress);
         #endregion
 
@@ -227,6 +268,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// A fresh successful analysis is written back to the cache exactly once,
+    /// so the next request for the same word becomes a hit.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_CachesFreshSuccesses()
     {
@@ -250,6 +295,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// A failed analysis is returned as a failure but never written to the cache,
+    /// so a transient provider error is not remembered as a result.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_DoesNotCacheFailures()
     {
@@ -294,6 +343,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// Cache misses are split into provider calls of at most <c>BatchSize</c> words:
+    /// 25 misses become batches of 10, 10 and 5.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_ChunksCacheMissesIntoBatchesOfTen()
     {
@@ -331,6 +384,11 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// A client that silently drops a word it was asked about must not shrink the batch:
+    /// the missing word comes back as a synthesized <see cref="AiOperationErrorCode.Unknown"/>
+    /// failure.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_WhenClientOmitsARequestedWord_ReturnsSynthesizedUnknownFailure()
     {
@@ -338,7 +396,7 @@ public class WordAnalysisServiceTests
 
         const string bike = "腳踏車", apple = "蘋果";
         GivenCached();
-        // The client answers for bike but silently drops apple  
+        // The client answers for bike but silently drops apple.
         _aiClient.AnalyzeAsync(
                 Arg.Any<IReadOnlyCollection<string>>(),
                 Arg.Any<CancellationToken>())
@@ -355,7 +413,7 @@ public class WordAnalysisServiceTests
         #endregion
 
         #region Act
-        // Analyze two uncached words even though the AI client is configured to return a result for only one of then.
+        // Analyze two uncached words even though the AI client is configured to return a result for only one of them.
         var result = await sut.AnalyzeBatchAsync(TestData.Command(bike, apple));
         #endregion
 
@@ -364,7 +422,7 @@ public class WordAnalysisServiceTests
         var missingWordResult = result.Items.Single(item => item.RequestedWord == apple);
         // Verify that the synthesized result is reported as a failure.
         Assert.False(missingWordResult.IsSuccess);
-        // Verify that an omitted AI result classified as an unknown failure.
+        // Verify that an omitted AI result is classified as an unknown failure.
         Assert.Equal(AiOperationErrorCode.Unknown, missingWordResult.ErrorCode);
         #endregion
     }
@@ -390,12 +448,16 @@ public class WordAnalysisServiceTests
         #endregion
 
         #region Assert
-        // Verify that the final batch result preserves the original request order 
-        // even though the results come from different source 
+        // Verify that the final batch result preserves the original request order
+        // even though the results come from different sources.
         Assert.Equal([a, b, c], result.Items.Select(item => item.RequestedWord));
         #endregion
     }
 
+    /// <summary>
+    /// A batch holding both a success and a failure is partially successful, not fully
+    /// successful, and counts each outcome separately.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_WithMixedOutcomes_ReportsPartialSuccess()
     {
@@ -441,6 +503,10 @@ public class WordAnalysisServiceTests
         #endregion
     }
 
+    /// <summary>
+    /// Cancellation is observed before each provider call, so an already-canceled token
+    /// throws without ever reaching the AI client.
+    /// </summary>
     [Fact]
     public async Task AnalyzeBatchAsync_WhenAlreadyCanceledWithMisses_ThrowsAndSkipsAi()
     {
@@ -469,13 +535,21 @@ public class WordAnalysisServiceTests
     }
     
     /// <summary>
-    /// Records progress synchronously. A plain <see cref="Progress{T}"/> marshals callbacks,
-    /// through the captured synchronization context, which would 
+    /// Records progress synchronously. A plain <see cref="Progress{T}"/> marshals callbacks
+    /// through the captured synchronization context, which would let the assertions run before
+    /// the reports arrive and make the tests flaky.
     /// </summary>
     private sealed class RecordingProgress : IProgress<WordAnalysisProgress>
     {
+        /// <summary>
+        /// Every update reported so far, in the order the service reported it.
+        /// </summary>
         public List<WordAnalysisProgress> Updates { get; } = [];
 
+        /// <summary>
+        /// Records one progress update.
+        /// </summary>
+        /// <param name="value">The update reported by the service.</param>
         public void Report(WordAnalysisProgress value) => Updates.Add(value);
     }
 }
