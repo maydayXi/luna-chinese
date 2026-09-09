@@ -46,7 +46,7 @@ public sealed class WordAnalysisService(
             completedCount = 0;
         
         // Map each word to its cache key so results can be looked back up by word
-        var cacheKeysByWord = words.ToDictionary(word => word, BuildCacheKey);
+        var cacheKeysByWord = words.ToDictionary(word => word, WordCacheKey.Build);
         
         // 1. Look up every word in the cache in a single call
         var cached = await cache.GetManyAsync(
@@ -103,12 +103,4 @@ public sealed class WordAnalysisService(
         // 3. Emit results in the original (distinct) request order.
         return new BatchWordAnalysisResult([.. words.Select(word => resultByWord[word])]);
     }
-
-    /// <summary>
-    /// Builds the cache key for a word. Currently the word itself, but centralized here so the
-    /// keying scheme (e.g. normalization or versioning) can evolve without touching callers.
-    /// </summary>
-    /// <param name="word">The (already normalized) word to build a key for.</param>
-    /// <returns>The cache key identifying the word's analysis.</returns>
-    private static string BuildCacheKey(string word) => word;
 }
