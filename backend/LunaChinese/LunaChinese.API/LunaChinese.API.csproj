@@ -7,7 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+        <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\LunaChinese.Core\LunaChinese.Core.csproj" />
+      <ProjectReference Include="..\LunaChinese.Infrastructure\LunaChinese.Infrastructure.csproj" />
     </ItemGroup>
 
 </Project>
