@@ -24,6 +24,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\LunaChinese.Core\LunaChinese.Core.csproj" />
+      <ProjectReference Include="..\LunaChinese.Infrastructure\LunaChinese.Infrastructure.csproj" />
     </ItemGroup>
 
 </Project>

@@ -29,8 +29,12 @@ public interface IAnalysisCache
         IReadOnlyCollection<string> cacheKeys, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Stores an analysis in the cache under the given key, overwriting any existing entry.
+    /// Stores an analysis in the cache under the given key.
     /// </summary>
+    /// <remarks>
+    /// Caching is first-writer-wins: if the word is already cached, the existing analysis is kept and
+    /// the call is a no-op. Callers must not rely on this method to refresh or replace a stale entry.
+    /// </remarks>
     /// <param name="cacheKey">The cache key to store the analysis under.</param>
     /// <param name="analysis">The analysis to cache.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
