@@ -4,6 +4,7 @@ using LunaChinese.Infrastructure.Context;
 using LunaChinese.Infrastructure.Features.WordsAnalysis;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace LunaChinese.Core.Test;
 
@@ -144,6 +145,7 @@ public class EfCoreAnalysisCacheTests : IDisposable
     public async Task GetManyAsync_ReturnsDictionaryKeyedByTheRequestedKeys()
     {
         #region Arrange
+
         const string expected = "bicycle";
         const string traditionalBike = "腳踏車";
         const string simplifiedBike = "脚踏车";
@@ -152,18 +154,23 @@ public class EfCoreAnalysisCacheTests : IDisposable
 
         string traditionalKey = WordCacheKey.Build(traditionalBike),
             simplifiedKey = WordCacheKey.Build(simplifiedBike);
+
         #endregion
 
         #region Act
+
         var result = await NewCache().GetManyAsync(
             [traditionalKey, simplifiedKey]);
+
         #endregion
 
         #region Assert
+
         // Both requested keys resolve, and each entry is keyed by the key that was asked for.
         Assert.True(result.ContainsKey(traditionalKey));
         Assert.True(result.ContainsKey(simplifiedKey));
         Assert.Equal(expected, result[simplifiedKey].EnglishMeaning);
+
         #endregion
     }
 
@@ -175,18 +182,24 @@ public class EfCoreAnalysisCacheTests : IDisposable
     public async Task GetManyAsync_OmitUncachedKeys()
     {
         #region Arrage
+
         const string bike = "腳踏車", apple = "蘋果";
         await NewCache().SetAsync(bike, TestData.Bicycle());
+
         #endregion
 
         #region Act
+
         var result = await NewCache().GetManyAsync(
             [WordCacheKey.Build(bike), WordCacheKey.Build(apple)]);
+
         #endregion
 
         #region Assert
+
         Assert.True(result.ContainsKey(WordCacheKey.Build(bike)));
         Assert.False(result.ContainsKey(WordCacheKey.Build(apple)));
+
         #endregion
     }
 
@@ -198,7 +211,7 @@ public class EfCoreAnalysisCacheTests : IDisposable
     {
         // Act
         var result = await NewCache().GetManyAsync([]);
-        
+
         // Assert
         Assert.Empty(result);
     }
@@ -212,24 +225,68 @@ public class EfCoreAnalysisCacheTests : IDisposable
     public async Task SetAsync_WhenAVariantIsAlreadyCached_DoseNotOverwrite()
     {
         #region Arrange
+
         const string expected = "bicycle", traditionalBike = "腳踏車", simplifiedBike = "脚踏车";
         WordAnalysis first = TestData.Bicycle(),
             second = first with { EnglishMeaning = "bike" };
+
         #endregion
 
         #region Act
+
         // First write wins; the second stored targets an overlapping alias set (same traditional)
         await NewCache().SetAsync(traditionalBike, first);
         await NewCache().SetAsync(simplifiedBike, second);
         var result = await NewCache().GetAsync(WordCacheKey.Build(simplifiedBike));
+
         #endregion
 
         #region Assert
+
         Assert.NotNull(result);
         Assert.Equal(expected, result.EnglishMeaning);
+
         #endregion
     }
-    
+
+    [Fact]
+    public async Task SetAsync_WhenARivalWinsTheRaceAfterTheCheck_SwallowsTheConflictAndKeepsTheFirstWrite()
+    {
+        #region Arrange
+        const string traditionalBike = "腳踏車", simplifiedBike = "脚踏车";
+        string traditionalKey = WordCacheKey.Build(traditionalBike),
+            simplifiedKey = WordCacheKey.Build(simplifiedBike);
+        
+        // wins the race: "bicycle", loses the race: "bike"
+        WordAnalysis rival = TestData.Bicycle(), loser = rival with { EnglishMeaning = "bike" };
+
+        // Runs inside the loser's SaveChanges, after its existence check has already passed against an empty
+        // database. A fresh (un-intercepted) cache commits the rival, so the loser's save hits the alias key
+        // that now exists.
+        async Task CommitRival(CancellationToken cancellationToken) =>
+            await NewCache().SetAsync(traditionalKey, rival, cancellationToken);
+
+        var interceptedOptions = new DbContextOptionsBuilder<LunaChineseDbContext>()
+            .UseSqlite(_connection)
+            .AddInterceptors(new ConflictInjectingInterceptor(CommitRival))
+            .Options;
+
+        EfCoreAnalysisCache sut = new(new LunaChineseDbContext(interceptedOptions));
+        #endregion
+
+        #region Act
+        var thrown = await Record.ExceptionAsync(() =>
+            sut.SetAsync(simplifiedKey, loser));
+        #endregion
+
+        #region Assert
+        Assert.Null(thrown);
+        var stored = await NewCache().GetAsync(simplifiedKey);
+        Assert.NotNull(stored);
+        Assert.Equal("bicycle", stored.EnglishMeaning);
+        #endregion
+    }
+
     /// <summary>
     /// A fully-populated analysis survives the JSON round-trip intact, nested records included.
     /// The cache stores the analysis as a serialized document, so anything the serializer drops would be
@@ -246,9 +303,34 @@ public class EfCoreAnalysisCacheTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(original.Pinyin, result!.Pinyin);
         Assert.Equal(original.HanjaReading, result.HanjaReading);
-        Assert.Equal(original.Example, result.Example);          // ExampleSentence is a record: value equality
+        Assert.Equal(original.Example, result.Example); // ExampleSentence is a record: value equality
         Assert.Single(result.Characters);
-        Assert.Equal(original.Characters.First(), result.Characters.First());  // CharacterAnalysis: value equality
+        Assert.Equal(original.Characters.First(), result.Characters.First()); // CharacterAnalysis: value equality
+    }
+
+    /// <summary>
+    /// A save-changes interceptor that runs a one-time side effect immediately before the context it is attached to persists its changes.
+    /// It exists to open the first-write-wins race deterministically:
+    /// the side effect commits a rival writer in the exact window between <see cref="EfCoreAnalysisCache.SetAsync"/>'s
+    /// existence check and its own save, so teh intercepted save is guaranteed to collide on teh shared alias key. 
+    /// </summary>
+    /// <param name="injectOnce"> The rival write to perform once, before the first intercepted save. </param>
+    private sealed class ConflictInjectingInterceptor(Func<CancellationToken, Task> injectOnce) : SaveChangesInterceptor
+    {
+        private bool _injected;
+
+        /// <inheritdoc/>
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (_injected) return result;
+            
+            _injected = true;
+            await injectOnce(cancellationToken);
+
+            return result;
+        }
     }
 
     /// <summary>

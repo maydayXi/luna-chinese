@@ -16,12 +16,13 @@ namespace LunaChinese.Infrastructure.Context;
 public sealed class LunaChineseDbContextFactory : IDesignTimeDbContextFactory<LunaChineseDbContext>
 {
     /// <summary>
-    /// The environment variable holding the design-time SQL Server connection string.
+    /// The environment variable holding the design-time Postgres SQL (Neon) connection string.
     /// </summary>
     private const string ConnectionEnvVariable = "LUNA_CHINESE_DB_CONNECTION";
 
     /// <summary>
-    /// Creates a new <see cref="LunaChineseDbContext"/> pointing at the local development SQLite database.
+    /// Creates a new <see cref="LunaChineseDbContext"/> pointing at the Neon Postgres SQL database,
+    /// used by the EF Core design-time tooling to generate and apply migrations.
     /// </summary>
     /// <param name="args">Arguments passed by the design-time tooling; not used.</param>
     /// <returns>A context configured for design-time use.</returns>

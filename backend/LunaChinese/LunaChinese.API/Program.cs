@@ -28,7 +28,7 @@ using (var scope = app.Services.CreateScope())
     // SQLite dev: create schema based on the model.
     if (app.Environment.IsDevelopment())
         db.Database.EnsureCreated();
-    // SQL Server production: migration
+    // Postgres (Neon) production: apply migrations
     else 
         db.Database.Migrate();
 }

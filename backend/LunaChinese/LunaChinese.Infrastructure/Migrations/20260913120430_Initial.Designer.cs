@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LunaChinese.Infrastructure.Migrations
 {
     [DbContext(typeof(LunaChineseDbContext))]
-    [Migration("20260913120430_Inital")]
-    partial class Inital
+    [Migration("20260913120430_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

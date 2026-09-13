@@ -13,17 +13,17 @@ public static class ContextExtensions
 {
     /// <summary>
     /// Registers <see cref="LunaChineseDbContext"/> with the service collection, choosing the
-    /// database provider from the host environment: SQLite in Development, SQL Server elsewhere.
+    /// database provider from the host environment: SQLite in Development, Postgres SQL (Neon) elsewhere.
     /// </summary>
     /// <param name="serviceCollection">The service collection to register the context with.</param>
     /// <param name="configuration">
     /// The configuration read for connection strings: <c>Sqlite</c> in Development
-    /// (falling back to a local <c>lunachinese.dev.db</c> file) and <c>SqlServer</c> otherwise.
+    /// (falling back to a local <c>lunachinese.dev.db</c> file) and <c>Postgres</c> otherwise.
     /// </param>
     /// <param name="hostEnvironment">The host environment deciding which provider is used.</param>
     /// <returns>The same <paramref name="serviceCollection"/>, so calls can be chained.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown outside Development when the <c>SqlServer</c> connection string is missing;
+    /// Thrown outside Development when the <c>Postgres</c> connection string is missing;
     /// production must never silently fall back to a local file database.
     /// </exception>
     public static IServiceCollection AddLunaChineseContext(this IServiceCollection serviceCollection,
