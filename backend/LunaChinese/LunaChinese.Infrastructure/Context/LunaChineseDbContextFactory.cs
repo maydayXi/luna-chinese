@@ -9,11 +9,17 @@ namespace LunaChinese.Infrastructure.Context;
 /// context from the API host's dependency injection container.
 /// </summary>
 /// <remarks>
-/// The connection string here is a local development SQLite file and is used only at design time;
-/// the running application configures its own connection through dependency injection.
+/// The connection string is read from <see cref="ConnectionEnvVariable"/> environment variable.
+/// There is no local fallback here - unlike SQL Server's integrated auth,
+/// Postgres always needs explicit credentials, so a missing value fails fast instead of silently guessing wrong.   
 /// </remarks>
 public sealed class LunaChineseDbContextFactory : IDesignTimeDbContextFactory<LunaChineseDbContext>
 {
+    /// <summary>
+    /// The environment variable holding the design-time SQL Server connection string.
+    /// </summary>
+    private const string ConnectionEnvVariable = "LUNA_CHINESE_DB_CONNECTION";
+
     /// <summary>
     /// Creates a new <see cref="LunaChineseDbContext"/> pointing at the local development SQLite database.
     /// </summary>
@@ -21,8 +27,12 @@ public sealed class LunaChineseDbContextFactory : IDesignTimeDbContextFactory<Lu
     /// <returns>A context configured for design-time use.</returns>
     public LunaChineseDbContext CreateDbContext(string[] args)
     {
+        var connectionString = Environment.GetEnvironmentVariable(ConnectionEnvVariable) ??
+                               throw new InvalidOperationException(
+                                   $"Set the '{ConnectionEnvVariable}' environment variable to your Neon connection string before running EF Core design-time tools");
+
         var options = new DbContextOptionsBuilder<LunaChineseDbContext>()
-            .UseSqlite("Data Source=lunachinese.dev.db")
+            .UseNpgsql(connectionString)
             .Options;
 
         return new LunaChineseDbContext(options);

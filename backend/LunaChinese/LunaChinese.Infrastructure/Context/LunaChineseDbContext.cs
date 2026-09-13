@@ -28,7 +28,8 @@ public sealed class LunaChineseDbContext(DbContextOptions<LunaChineseDbContext> 
             entity.HasKey(analysis => analysis.CanonicalKey);
             entity.Property(analysis => analysis.CanonicalKey).HasMaxLength(256);
             entity.Property(analysis => analysis.ContentJson).IsRequired();
-            entity.Property(analysis => analysis.CreatedAtUtc).IsRequired();
+            entity.Property(analysis => analysis.CreatedAtUtc).IsRequired()
+                .HasColumnType("timestamp with time zone");
         });
 
         modelBuilder.Entity<AnalysisAlias>(entity =>

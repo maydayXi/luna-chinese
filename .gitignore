@@ -367,3 +367,10 @@ FodyWeavers.xsd
 
 # JetBrains Rider / IntelliJ IDEA
 .idea/
+
+# Local SQLite dev database
+*.db
+
+# Local environment files (may hold connection strings/secrets)
+.env
+.env.*
