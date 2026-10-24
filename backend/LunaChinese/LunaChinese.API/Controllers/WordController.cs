@@ -12,7 +12,7 @@ namespace LunaChinese.API.Controllers;
 /// </summary>
 /// <param name="extractionAiClient"></param>
 [ApiController, Route("api/[controller]")]
-public class WordController(IWordExtractionAiClient extractionAiClient) : ControllerBase
+public sealed class WordController(IWordExtractionAiClient extractionAiClient) : ControllerBase
 {
     /// <summary>
     /// Extracts Chinese words from an upload page image.

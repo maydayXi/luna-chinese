@@ -21,7 +21,7 @@ namespace LunaChinese.Infrastructure.Features.WordsExtraction.Gemini;
 /// <c>x-goog-api-key</c> header, both configured at registration time;
 /// this class owns only the request shape, response parsing, and the mapping from failure to <see cref="AiOperationErrorCode"/>.
 /// </remarks>
-public class GeminiAiClient(HttpClient httpClient, GeminiExtractionOptions options) : IWordExtractionAiClient
+public sealed class GeminiAiClient(HttpClient httpClient, GeminiExtractionOptions options) : IWordExtractionAiClient
 {
     /// <summary>
     /// Web defaults (camel-cased names) so the PascalCase DTOs serialize to the field names the Gemini API expects,

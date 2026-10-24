@@ -17,7 +17,7 @@ namespace LunaChinese.Infrastructure.Features.WordsAnalysis;
 /// resolves to a single stored entry.
 /// </remarks>
 /// <param name="dbContext">The database context holding the cached analyses and their aliases.</param>
-public class EfCoreAnalysisCache(LunaChineseDbContext dbContext) : IAnalysisCache
+public sealed class EfCoreAnalysisCache(LunaChineseDbContext dbContext) : IAnalysisCache
 {
     /// <summary>
     /// The options used to serialize and deserialize the stored JSON documents.
