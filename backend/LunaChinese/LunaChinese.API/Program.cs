@@ -1,8 +1,39 @@
+using LunaChinese.Core.Features.WordsAnalysis;
+using LunaChinese.Core.Features.WordsExtraction;
+using LunaChinese.Infrastructure.Context;
+using LunaChinese.Infrastructure.Extensions;
+using LunaChinese.Infrastructure.Features.WordsAnalysis;
+using LunaChinese.Infrastructure.Features.WordsExtraction.Gemini;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+builder.Services.AddLunaChineseContext(builder.Configuration, builder.Environment);
+builder.Services.AddScoped<IAnalysisCache, EfCoreAnalysisCache>();
+
+#region Gemini
+
+const string geminiKey = "Gemini";
+
+var geminiSection = builder.Configuration.GetSection(geminiKey);
+var geminiOptions = geminiSection.Get<GeminiExtractionOptions>()
+    ?? throw new InvalidOperationException($"Missing '{geminiKey}' configuration section.");
+if (string.IsNullOrWhiteSpace(geminiOptions.Model))
+    throw new InvalidOperationException($"Missing '{geminiKey}:{nameof(geminiOptions.Model)}' configuration value.");
+var geminiApiKey = geminiSection["ApiKey"] ?? 
+                   throw new InvalidOperationException($"Missing '{geminiKey}:ApiKey' configuration value.");
+
+builder.Services.AddSingleton(geminiOptions)
+    .AddHttpClient<IWordExtractionAiClient, GeminiAiClient>(client =>
+    {
+        client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/");
+        client.DefaultRequestHeaders.Add("x-goog-api-key", geminiApiKey);
+    });
+#endregion
 
 var app = builder.Build();
 
@@ -14,28 +45,17 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+using (var scope = app.Services.CreateScope())
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var db = scope.ServiceProvider.GetRequiredService<LunaChineseDbContext>();
+    // SQLite dev: create schema based on the model.
+    if (app.Environment.IsDevelopment())
+        db.Database.EnsureCreated();
+    // Postgres (Neon) production: apply migrations
+    else 
+        db.Database.Migrate();
+}
 
-app.MapGet("/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
+app.MapControllers();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

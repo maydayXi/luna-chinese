@@ -1,6 +1,29 @@
-@LunaChinese.API_HostAddress = http://localhost:5247
+@HostAddress = http://localhost:5247
 
-GET {{LunaChinese.API_HostAddress}}/weatherforecast/
-Accept: application/json
+### Extract all vocabulary from a page image (expects 200 with { "words": [...] })
+# Put a test image at LunaChinese.API/samples/page.jpg, or change the path below.
+POST {{HostAddress}}/api/Word/extract
+Content-Type: multipart/form-data; boundary=b
+
+--b
+Content-Disposition: form-data; name="image"; filename="page.jpg"
+Content-Type: image/jpeg
+
+< ./samples/page.jpg
+--b
+Content-Disposition: form-data; name="mode"
+
+All
+--b--
+
+### Missing image (expects 400 "An image file is required!")
+POST {{HostAddress}}/api/Word/extract
+Content-Type: multipart/form-data; boundary=b
+
+--b
+Content-Disposition: form-data; name="mode"
+
+All
+--b--
 
 ###
