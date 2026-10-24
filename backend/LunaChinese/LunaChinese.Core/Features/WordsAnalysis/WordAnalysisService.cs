@@ -78,7 +78,12 @@ public sealed class WordAnalysisService(
             var batchResults = await aiClient.AnalyzeAsync(batch, cancellationToken)
                 .ConfigureAwait(false);
 
-            var batchResultByWord = batchResults.ToDictionary(result => result.RequestedWord);
+            // Defend against a client that returns a word more than once: keep one result per word
+            // (a success if there is one) rather than failing the whole batch on a duplicate key.
+            var batchResultByWord = batchResults
+                .GroupBy(result => result.RequestedWord)
+                .ToDictionary(group => group.Key,
+                    group => group.FirstOrDefault(result => result.IsSuccess) ?? group.First());
 
             foreach (var word in batch)
             {

@@ -288,6 +288,35 @@ public class EfCoreAnalysisCacheTests : IDisposable
     }
 
     /// <summary>
+    /// A save failure that is <b>not</b> a lost first-writer race (no rival alias exists afterwards) is rethrown.
+    /// Only the race is safe to absorb; swallowing every <see cref="DbUpdateException"/> would silently drop
+    /// real persistence errors such as an over-long value or a lost connection.
+    /// </summary>
+    [Fact]
+    public async Task SetAsync_WhenTheSaveFailsWithoutARival_RethrowsTheFailure()
+    {
+        #region Arrange
+        var interceptedOptions = new DbContextOptionsBuilder<LunaChineseDbContext>()
+            .UseSqlite(_connection)
+            .AddInterceptors(new ConflictInjectingInterceptor(_ =>
+                throw new DbUpdateException("Simulated non-conflict save failure.")))
+            .Options;
+
+        EfCoreAnalysisCache sut = new(new LunaChineseDbContext(interceptedOptions));
+        #endregion
+
+        #region Act
+        var thrown = await Record.ExceptionAsync(() =>
+            sut.SetAsync(WordCacheKey.Build("腳踏車"), TestData.Bicycle()));
+        #endregion
+
+        #region Assert
+        Assert.IsType<DbUpdateException>(thrown);
+        Assert.Null(await NewCache().GetAsync(WordCacheKey.Build("腳踏車")));
+        #endregion
+    }
+
+    /// <summary>
     /// A fully-populated analysis survives the JSON round-trip intact, nested records included.
     /// The cache stores the analysis as a serialized document, so anything the serializer drops would be
     /// lost silently on every later cache hit.

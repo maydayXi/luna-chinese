@@ -24,6 +24,7 @@ public class WordController(IWordExtractionAiClient extractionAiClient) : Contro
     [HttpPost("extract")]
     [ProducesResponseType<ExtractWordsResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public async Task<IActionResult> ExtraAsync(IFormFile? image, [FromForm] ExtractMode mode,
         CancellationToken cancellationToken)
     {
@@ -41,8 +42,17 @@ public class WordController(IWordExtractionAiClient extractionAiClient) : Contro
                 ? MediaTypeNames.Image.Jpeg
                 : image.ContentType;
 
-        var result = await extractionAiClient.ExtractAsync(new ExtractionImage(base64, mediaType), 
-            mode, cancellationToken);
+        WordExtractionResult result;
+        try
+        {
+            result = await extractionAiClient.ExtractAsync(new ExtractionImage(base64, mediaType),
+                mode, cancellationToken);
+        }
+        catch (NotSupportedException exception)
+        {
+            // A valid mode the configured extractor doesn't implement yet (e.g. MarkedOnly) - not a server fault.
+            return Problem(detail: exception.Message, statusCode: StatusCodes.Status501NotImplemented);
+        }
 
         return result.IsSuccess
             ? Ok(new ExtractWordsResponse(result.Words!))

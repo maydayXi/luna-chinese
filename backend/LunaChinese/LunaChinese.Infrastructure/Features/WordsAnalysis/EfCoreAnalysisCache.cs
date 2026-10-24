@@ -84,6 +84,7 @@ public class EfCoreAnalysisCache(LunaChineseDbContext dbContext) : IAnalysisCach
     /// The first-writer-wins check covers every surface form of the word, not just <paramref name="cacheKey"/>.
     /// A concurrent writer that wins the race between that check and the save is absorbed the same way:
     /// the alias primary key rejects the duplicate and the pending inserts are discarded.
+    /// Any other save failure is rethrown rather than silently dropped.
     /// </remarks>
     public async Task SetAsync(string cacheKey, WordAnalysis analysis, CancellationToken cancellationToken = default)
     {
@@ -125,10 +126,16 @@ public class EfCoreAnalysisCache(LunaChineseDbContext dbContext) : IAnalysisCach
         }
         catch (DbUpdateException)
         {
-            // A concurrent writer inserted an overlapping alias between the check above and this save
-            // (the Aliases primary key rejects the duplicate).
-            // First writer wins: discard our pending inserts and keep the context usable for later calls.
+            // Discard our pending inserts so the context stays usable either way.
             dbContext.ChangeTracker.Clear();
+
+            // Only a concurrent writer that inserted an overlapping alias between the check above and this save
+            // is absorbed (first writer wins). Any other failure - a too-long value, a lost connection - must surface.
+            var rivalWon = await dbContext.Aliases
+                .AnyAsync(alias => keys.Contains(alias.Alias), cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!rivalWon) throw;
         }
     }
 }

@@ -535,6 +535,43 @@ public class WordAnalysisServiceTests
     }
     
     /// <summary>
+    /// An AI client that returns the same word more than once (here a failure followed by a success)
+    /// must not fail the batch: the service keeps one result per word, preferring the success,
+    /// and the other words in the batch are unaffected. Failures are per word, never per batch.
+    /// </summary>
+    [Fact]
+    public async Task AnalyzeBatchAsync_WhenAiReturnsAWordTwice_KeepsOneResultPreferringSuccess()
+    {
+        #region Arrange
+
+        const string duplicated = "學習", other = "老師";
+        GivenCached();
+        _aiClient.AnalyzeAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<WordAnalysisItemResult>>(
+            [
+                WordAnalysisItemResult.Failure(duplicated, AiOperationErrorCode.InvalidResponse, "Garbled."),
+                WordAnalysisItemResult.Success(duplicated, TestData.Analysis(duplicated)),
+                WordAnalysisItemResult.Success(other, TestData.Analysis(other))
+            ]));
+        var sut = CreateSut();
+
+        #endregion
+
+        #region Act
+
+        var result = await sut.AnalyzeBatchAsync(TestData.Command(duplicated, other));
+
+        #endregion
+
+        #region Assert
+
+        Assert.Equal([duplicated, other], result.Items.Select(item => item.RequestedWord));
+        Assert.All(result.Items, item => Assert.True(item.IsSuccess));
+
+        #endregion
+    }
+
+    /// <summary>
     /// Records progress synchronously. A plain <see cref="Progress{T}"/> marshals callbacks
     /// through the captured synchronization context, which would let the assertions run before
     /// the reports arrive and make the tests flaky.
