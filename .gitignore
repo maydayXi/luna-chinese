@@ -370,7 +370,12 @@ FodyWeavers.xsd
 
 # Local SQLite dev database
 *.db
+*.db-shm
+*.db-wal
 
 # Local environment files (may hold connection strings/secrets)
 .env
 .env.*
+
+# Local test images for LunaChinese.API.http requests
+backend/LunaChinese/LunaChinese.API/samples/
