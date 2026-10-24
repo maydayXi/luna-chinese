@@ -1,23 +1,24 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>58640c4e-0bcf-4418-bbd6-634b55de0084</UserSecretsId>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
-          <PrivateAssets>all</PrivateAssets>
-          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
+        <PackageReference Include="Microsoft.OpenApi" Version="2.12.2"/>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\LunaChinese.Core\LunaChinese.Core.csproj" />
-      <ProjectReference Include="..\LunaChinese.Infrastructure\LunaChinese.Infrastructure.csproj" />
+        <ProjectReference Include="..\LunaChinese.Core\LunaChinese.Core.csproj"/>
+        <ProjectReference Include="..\LunaChinese.Infrastructure\LunaChinese.Infrastructure.csproj"/>
     </ItemGroup>
 
 </Project>
