@@ -15,6 +15,21 @@ namespace LunaChinese.API.Controllers;
 public sealed class WordController(IWordExtractionAiClient extractionAiClient) : ControllerBase
 {
     /// <summary>
+    /// The largest accepted upload. Base64 grows the image by about a third, so 10 MB stays well inside
+    /// Gemini's 20 MB inline request limit while comfortably fitting a phone photo of a page.
+    /// </summary>
+    private const long MaxImageBytes = 10 * 1024 * 1024;
+
+    /// <summary>
+    /// The image media types Gemini accepts as inline data.
+    /// Anything else is rejected here rather than spent on a provider call that would fail.
+    /// </summary>
+    private static readonly HashSet<string> SupportedMediaTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        MediaTypeNames.Image.Jpeg, MediaTypeNames.Image.Png, MediaTypeNames.Image.Webp, "image/heic", "image/heif"
+    };
+
+    /// <summary>
     /// Extracts Chinese words from an upload page image.
     /// </summary>
     /// <param name="image"> The upload page image. </param>
@@ -24,6 +39,8 @@ public sealed class WordController(IWordExtractionAiClient extractionAiClient) :
     [HttpPost("extract")]
     [ProducesResponseType<ExtractWordsResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(StatusCodes.Status415UnsupportedMediaType)]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]
     public async Task<IActionResult> ExtraAsync(IFormFile? image, [FromForm] ExtractMode mode,
         CancellationToken cancellationToken)
@@ -34,13 +51,21 @@ public sealed class WordController(IWordExtractionAiClient extractionAiClient) :
                 error = "An image file is required!"
             });
 
-        // Read the upload as raw bytes at the boundary, and Base64-encode for the Core contract. 
+        // Validate before buffering, so an oversized or non-image upload is never read into memory or sent on.
+        if (image.Length > MaxImageBytes)
+            return Problem(detail: $"The image must be at most {MaxImageBytes / (1024 * 1024)} MB.",
+                statusCode: StatusCodes.Status413PayloadTooLarge);
+
+        var mediaType = image.ContentType?.Split(';')[0].Trim().ToLowerInvariant() ?? string.Empty;
+        if (!SupportedMediaTypes.Contains(mediaType))
+            return Problem(
+                detail: $"Unsupported image type '{mediaType}'. Supported: {string.Join(", ", SupportedMediaTypes)}.",
+                statusCode: StatusCodes.Status415UnsupportedMediaType);
+
+        // Read the upload as raw bytes at the boundary, and Base64-encode for the Core contract.
         using var stream = new MemoryStream();
         await image.CopyToAsync(stream, cancellationToken);
-        string base64 = Convert.ToBase64String(stream.ToArray()),
-            mediaType = string.IsNullOrWhiteSpace(image.ContentType)
-                ? MediaTypeNames.Image.Jpeg
-                : image.ContentType;
+        var base64 = Convert.ToBase64String(stream.ToArray());
 
         WordExtractionResult result;
         try
