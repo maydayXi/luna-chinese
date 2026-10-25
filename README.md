@@ -70,7 +70,7 @@ Extracts vocabulary from a page image.
 
 | Form field | Type | Description |
 |---|---|---|
-| `image` | file | The page photo (JPEG/PNG). |
+| `image` | file | The page photo: JPEG, PNG, WebP, HEIC, or HEIF, up to 10 MB. |
 | `mode` | `All` \| `MarkedOnly` | Which words to extract. Defaults to `All`; `MarkedOnly` is not implemented yet. |
 
 ```bash
@@ -86,9 +86,14 @@ curl -X POST http://localhost:5247/api/Word/extract \
 |---|---|
 | `200` | Success; `words` may be empty if nothing eligible was found. |
 | `400` | No image uploaded. |
+| `413` | Image larger than 10 MB. |
+| `415` | Not a supported image type. |
 | `501` | The requested `mode` is not implemented. |
-| `429` / `503` / `504` / `502` | Provider rate-limited / overloaded / timed out / returned an unusable response. |
-| `500` | Any other provider or server failure. |
+| `429` | Provider rate limit exceeded. |
+| `503` | Provider temporarily unavailable (provider 500/502/503). |
+| `504` | Provider timed out. |
+| `502` | Provider returned an unusable response. |
+| `500` | Any other failure (e.g. a misconfigured model name). The provider's error details are written to the API log. |
 
 `backend/LunaChinese/LunaChinese.API/LunaChinese.API.http` has ready-to-send requests; put a test image at `LunaChinese.API/samples/page.jpg` (git-ignored).
 

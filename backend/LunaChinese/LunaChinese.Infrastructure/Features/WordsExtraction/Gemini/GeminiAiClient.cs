@@ -6,6 +6,7 @@ using LunaChinese.Core.Features.WordsExtraction;
 using LunaChinese.Core.Models.Extraction;
 using LunaChinese.Infrastructure.Features.WordsExtraction.Gemini.Request;
 using LunaChinese.Infrastructure.Features.WordsExtraction.Gemini.Response;
+using Microsoft.Extensions.Logging;
 
 namespace LunaChinese.Infrastructure.Features.WordsExtraction.Gemini;
 
@@ -16,13 +17,23 @@ namespace LunaChinese.Infrastructure.Features.WordsExtraction.Gemini;
 /// </summary>
 /// <param name="httpClient"> The typed client pointing at the Gemini API.</param>
 /// <param name="options"> The per-environment settings, notably the model name. </param>
+/// <param name="logger"> Records the provider's error body, which is kept out of the caller-facing result. </param>
 /// <remarks>
 /// The typed <paramref name="httpClient"/> is expected to carry the Gemini base address and the
 /// <c>x-goog-api-key</c> header, both configured at registration time;
 /// this class owns only the request shape, response parsing, and the mapping from failure to <see cref="AiOperationErrorCode"/>.
 /// </remarks>
-public sealed class GeminiAiClient(HttpClient httpClient, GeminiExtractionOptions options) : IWordExtractionAiClient
+public sealed class GeminiAiClient(
+    HttpClient httpClient,
+    GeminiExtractionOptions options,
+    ILogger<GeminiAiClient> logger) : IWordExtractionAiClient
 {
+    /// <summary>
+    /// The most of a provider error body written to the log; Gemini's errors are short JSON documents,
+    /// so this only guards against an unexpectedly large body (e.g. an HTML error page from a proxy).
+    /// </summary>
+    private const int MaxLoggedErrorBodyLength = 2000;
+
     /// <summary>
     /// Web defaults (camel-cased names) so the PascalCase DTOs serialize to the field names the Gemini API expects,
     /// and its camelCase response deserializes back without per-property attributes. 
@@ -84,6 +95,13 @@ public sealed class GeminiAiClient(HttpClient httpClient, GeminiExtractionOption
         {
             if (!response.IsSuccessStatusCode)
             {
+                // The body explains failures the status alone can't (an invalid model name, a bad API key).
+                // Log it for diagnosis, but keep it out of the result, which reaches API callers.
+                var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                logger.LogWarning("Gemini returned HTTP {StatusCode} for model {Model}: {Body}",
+                    (int)response.StatusCode, options.Model,
+                    body.Length > MaxLoggedErrorBodyLength ? body[..MaxLoggedErrorBodyLength] : body);
+
                 var (code, message) = MapFailureStatus(response.StatusCode);
                 return WordExtractionResult.Failure(code, message);
             }
@@ -167,6 +185,9 @@ public sealed class GeminiAiClient(HttpClient httpClient, GeminiExtractionOption
 
     /// <summary>
     /// Maps a non-success HTTP status to the matching <see cref="AiOperationErrorCode"/> and a message.
+    /// Transient provider faults (500/502/503/529) map to <see cref="AiOperationErrorCode.ProviderOverloaded"/>
+    /// and provider-side deadlines (408/504) to <see cref="AiOperationErrorCode.Timeout"/>, so callers can tell a
+    /// retryable provider fault from a request problem, which stays <see cref="AiOperationErrorCode.Unknown"/>.
     /// </summary>
     /// <param name="statusCode">The status returned by the provider.</param>
     /// <returns> The classified error and a human-readable description. </returns>
@@ -176,9 +197,13 @@ public sealed class GeminiAiClient(HttpClient httpClient, GeminiExtractionOption
             (int)HttpStatusCode.TooManyRequests => (
                 AiOperationErrorCode.RateLimited,
                 "The provider rate limit was exceeded."),
-            (int)HttpStatusCode.ServiceUnavailable or 529 => (
+            (int)HttpStatusCode.InternalServerError or (int)HttpStatusCode.BadGateway
+                or (int)HttpStatusCode.ServiceUnavailable or 529 => (
                 AiOperationErrorCode.ProviderOverloaded,
-                "The provider was temporarily overloaded."),
+                "The provider was temporarily unavailable."),
+            (int)HttpStatusCode.RequestTimeout or (int)HttpStatusCode.GatewayTimeout => (
+                AiOperationErrorCode.Timeout,
+                "The provider timed out."),
             _ => (AiOperationErrorCode.Unknown, $"The provider returned HTTP status {(int)statusCode}")
         };
 
